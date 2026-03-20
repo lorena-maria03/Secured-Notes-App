@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-jose[cryptography]
+bcrypt
+sendgrid
+pillow
+sqlalchemy
+python-dotenv
+cryptography
+aiofiles
+pydantic[email]
+python-multipart

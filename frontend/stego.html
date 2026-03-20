@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steganography - Secured Notes</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; background: #f5f5f5; }
+        .navbar { background: white; padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .navbar h1 { font-size: 18px; color: #4F46E5; }
+        button.btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; }
+        button.btn-primary { background: #4F46E5; color: white; }
+        button.btn-primary:hover { background: #4338CA; }
+        button.btn-outline { background: white; border: 1px solid #ddd; color: #333; }
+        button.btn-outline:hover { background: #f5f5f5; }
+        .container { max-width: 900px; margin: 32px auto; padding: 0 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .card h2 { font-size: 16px; color: #333; margin-bottom: 6px; }
+        .card p.desc { font-size: 13px; color: #888; margin-bottom: 20px; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; }
+        input[type="text"], textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; font-family: inherit; }
+        input[type="text"]:focus, textarea:focus { border-color: #4F46E5; }
+        input[type="file"] { width: 100%; padding: 8px; border: 1px dashed #ddd; border-radius: 8px; font-size: 13px; cursor: pointer; }
+        textarea { height: 100px; resize: vertical; }
+        button.btn-full { width: 100%; padding: 12px; border-radius: 8px; border: none; cursor: pointer; font-size: 15px; background: #4F46E5; color: white; margin-top: 4px; }
+        button.btn-full:hover { background: #4338CA; }
+        .message { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
+        .message.error { background: #FEE2E2; color: #991B1B; }
+        .message.success { background: #D1FAE5; color: #065F46; }
+        .preview { margin-top: 16px; }
+        .preview img { width: 100%; border-radius: 8px; border: 1px solid #eee; }
+        .preview a { display: inline-block; margin-top: 10px; padding: 8px 16px; background: #4F46E5; color: white; border-radius: 8px; text-decoration: none; font-size: 13px; }
+        .preview a:hover { background: #4338CA; }
+        .result-box { background: #F5F3FF; border: 1px solid #C4B5FD; border-radius: 8px; padding: 14px; margin-top: 12px; }
+        .result-box p { font-size: 13px; color: #5B21B6; word-break: break-all; }
+        .info-box { background: #EEF2FF; border-radius: 8px; padding: 12px; margin-bottom: 20px; font-size: 12px; color: #4F46E5; line-height: 1.5; }
+        .sql-section { margin-top: 24px; }
+        .full-width { grid-column: 1 / -1; }
+    </style>
+</head>
+<body>
+<nav class="navbar">
+    <h1>Secured Notes — Steganography & SQL Checker</h1>
+    <div>
+        <button class="btn btn-outline" onclick="window.location.href='notes.html'">Back to Notes</button>
+    </div>
+</nav>
+
+<div class="container">
+
+    <!-- Hide Message -->
+    <div class="card">
+        <h2>Hide a message in an image</h2>
+        <p class="desc">Uses LSB steganography — hides text in pixel data, invisible to the human eye.</p>
+
+        <div class="info-box">
+            The message is hidden by modifying the least significant bit of each RGB channel. The image looks identical but contains your hidden text.
+        </div>
+
+        <div class="form-group">
+            <label>Select image (PNG or JPG)</label>
+            <input type="file" id="hide-image" accept="image/*"/>
+        </div>
+        <div class="form-group">
+            <label>Message to hide</label>
+            <textarea id="hide-message" placeholder="Enter the secret message..."></textarea>
+        </div>
+        <button class="btn-full" onclick="hideMessage()">Hide message</button>
+        <div id="hide-result"></div>
+    </div>
+
+    <!-- Extract Message -->
+    <div class="card">
+        <h2>Extract message from image</h2>
+        <p class="desc">Upload an image that contains a hidden message to extract it.</p>
+
+        <div class="info-box">
+            Upload an image previously processed with the hide tool. The hidden message will be extracted from the pixel data.
+        </div>
+
+        <div class="form-group">
+            <label>Select image with hidden message</label>
+            <input type="file" id="extract-image" accept="image/*"/>
+        </div>
+        <button class="btn-full" onclick="extractMessage()">Extract message</button>
+        <div id="extract-result"></div>
+    </div>
+
+    <!-- SQL Injection Checker -->
+    <div class="card full-width">
+        <h2>SQL Injection Checker</h2>
+        <p class="desc">Test if an input contains SQL injection patterns before using it in a query.</p>
+
+        <div class="form-group">
+            <label>Input to check</label>
+            <input type="text" id="sql-input" placeholder="e.g. admin' OR '1'='1"/>
+        </div>
+        <button class="btn-full" onclick="checkSQL()">Check input</button>
+        <div id="sql-result"></div>
+    </div>
+
+</div>
+
+<script>
+    const API = "http://127.0.0.1:8001";
+    let token = localStorage.getItem('token');
+
+    if (!token) window.location.href = 'index.html';
+
+    function authHeaders() {
+        return { 'Authorization': `Bearer ${token}` };
+    }
+
+    async function hideMessage() {
+        const imageFile = document.getElementById('hide-image').files[0];
+        const message = document.getElementById('hide-message').value;
+        const resultDiv = document.getElementById('hide-result');
+
+        if (!imageFile || !message) {
+            resultDiv.innerHTML = '<div class="message error">Please select an image and enter a message.</div>';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('image', imageFile);
+        formData.append('message', message);
+
+        try {
+            const res = await fetch(`${API}/crypto/stego/hide?message=${encodeURIComponent(message)}`, {
+                method: 'POST',
+                headers: authHeaders(),
+                body: (() => { const fd = new FormData(); fd.append('image', imageFile); return fd; })()
+            });
+
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                resultDiv.innerHTML = `
+                    <div class="message success">Message hidden successfully!</div>
+                    <div class="preview">
+                        <img src="${url}" alt="Stego image"/>
+                        <a href="${url}" download="stego_image.png">Download image</a>
+                    </div>
+                `;
+            } else {
+                const data = await res.json();
+                resultDiv.innerHTML = `<div class="message error">${data.detail || 'Error hiding message'}</div>`;
+            }
+        } catch (e) {
+            resultDiv.innerHTML = '<div class="message error">Connection error</div>';
+        }
+    }
+
+    async function extractMessage() {
+        const imageFile = document.getElementById('extract-image').files[0];
+        const resultDiv = document.getElementById('extract-result');
+
+        if (!imageFile) {
+            resultDiv.innerHTML = '<div class="message error">Please select an image.</div>';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('image', imageFile);
+
+        try {
+            const res = await fetch(`${API}/crypto/stego/extract`, {
+                method: 'POST',
+                headers: authHeaders(),
+                body: formData
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                resultDiv.innerHTML = `
+                    <div class="message success">Message extracted successfully!</div>
+                    <div class="result-box">
+                        <p>${data.message}</p>
+                    </div>
+                `;
+            } else {
+                const data = await res.json();
+                resultDiv.innerHTML = `<div class="message error">${data.detail || 'Error extracting message'}</div>`;
+            }
+        } catch (e) {
+            resultDiv.innerHTML = '<div class="message error">Connection error</div>';
+        }
+    }
+
+    async function checkSQL() {
+        const input = document.getElementById('sql-input').value;
+        const resultDiv = document.getElementById('sql-result');
+
+        if (!input) {
+            resultDiv.innerHTML = '<div class="message error">Please enter an input to check.</div>';
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API}/crypto/check-sql`, {
+                method: 'POST',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ input_text: input })
+            });
+
+            const data = await res.json();
+            if (data.safe) {
+                resultDiv.innerHTML = '<div class="message success">Input is safe — no SQL injection patterns detected.</div>';
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="message error">SQL injection detected!</div>
+                    <div class="result-box">
+                        <p>Patterns found: ${data.patterns_found.join(', ')}</p>
+                    </div>
+                `;
+            }
+        } catch (e) {
+            resultDiv.innerHTML = '<div class="message error">Connection error</div>';
+        }
+    }
+</script>
+</body>
+</html>
+
