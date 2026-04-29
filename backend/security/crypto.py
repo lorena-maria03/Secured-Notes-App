@@ -98,14 +98,15 @@ def decrypt_with_rsa(encrypted_b64: str, private_key_pem: str) -> bytes:
 
 # ------------------ Digital Signature
 
-def sign_note(content: str, private_key_pem: str) -> str:
+def sign_note(title: str, content: str, private_key_pem: str) -> str:
     private_key = serialization.load_pem_private_key(
         private_key_pem.encode(),
         password=None,
         backend=default_backend()
     )
+    payload = f"{title}\n{content}".encode()
     signature = private_key.sign(
-        content.encode(),
+        payload,
         padding.PSS(
             mgf=padding.MGF1(SHA256()),
             salt_length=padding.PSS.MAX_LENGTH
@@ -114,15 +115,16 @@ def sign_note(content: str, private_key_pem: str) -> str:
     )
     return base64.b64encode(signature).decode()
 
-def verify_signature(content: str, signature_b64: str, public_key_pem: str) -> bool:
+def verify_signature(title: str, content: str, signature_b64: str, public_key_pem: str) -> bool:
     try:
         public_key = serialization.load_pem_public_key(
             public_key_pem.encode(),
             backend=default_backend()
         )
+        payload = f"{title}\n{content}".encode()
         public_key.verify(
             base64.b64decode(signature_b64),
-            content.encode(),
+            payload,
             padding.PSS(
                 mgf=padding.MGF1(SHA256()),
                 salt_length=padding.PSS.MAX_LENGTH

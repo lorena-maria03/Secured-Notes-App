@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, validator
+import time
 
 from database import get_db
 from models import User, UserKey
@@ -47,15 +48,12 @@ def get_current_user_id(request: Request) -> int:
 
 @router.post("/register")
 def register(data: RegisterSchema, db: Session = Depends(get_db)):
-    # 1. verifica email
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # 2. verifica username
     if db.query(User).filter(User.username == data.username).first():
         raise HTTPException(status_code=400, detail="Username already taken")
 
-    # 3. verifica parola
     p = data.password
     if len(p) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
@@ -66,16 +64,23 @@ def register(data: RegisterSchema, db: Session = Depends(get_db)):
     if not any(c.isdigit() for c in p):
         raise HTTPException(status_code=400, detail="Password must contain at least one number")
 
+    start = time.time()
+    hashed = hash_password(data.password)
+    print(f"[TIMING] bcrypt hashing: {(time.time()-start)*1000:.2f}ms")
+
     user = User(
         email=data.email,
         username=data.username,
-        hashed_password=hash_password(data.password)
+        hashed_password=hashed
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
+    start = time.time()
     public_key, private_key = generate_rsa_keypair()
+    print(f"[TIMING] RSA key generation: {(time.time()-start)*1000:.2f}ms")
+
     user_key = UserKey(
         user_id=user.id,
         public_key=public_key,
@@ -95,7 +100,12 @@ def login(data: LoginSchema, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
 
     user = db.query(User).filter(User.email == data.email).first()
-    if not user or not verify_password(data.password, user.hashed_password):
+
+    start = time.time()
+    valid = user and verify_password(data.password, user.hashed_password)
+    print(f"[TIMING] bcrypt verify: {(time.time()-start)*1000:.2f}ms")
+
+    if not valid:
         record_attempt(ip)
         raise HTTPException(status_code=401, detail="Invalid email or password")
 

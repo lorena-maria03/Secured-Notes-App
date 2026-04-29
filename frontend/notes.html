@@ -249,6 +249,7 @@
         document.getElementById('btn-export').style.display = 'none';
         document.getElementById('btn-save').style.display = 'inline-block';
         document.getElementById('sig-badge').innerHTML = '';
+        document.querySelector('.security-bar').style.display = 'none';
         document.getElementById('modal-message').innerHTML = '';
         document.getElementById('export-panel').classList.remove('open');
         document.getElementById('export-result').innerHTML = '';
@@ -259,11 +260,44 @@
 
     async function openNote(id) {
         const res = await authFetch(`${API}/notes/${id}`);
-        if (!res.ok) return;
-        const note = await res.json();
-
         currentNoteId = id;
         exportOpen = false;
+        document.getElementById('export-panel').classList.remove('open');
+        document.getElementById('export-result').innerHTML = '';
+        document.getElementById('export-image').value = '';
+
+        if (!res.ok) {
+            document.getElementById('modal-title').textContent = 'Error';
+            document.getElementById('modal-note-title').value = '';
+            document.getElementById('modal-note-content').value = '';
+            document.getElementById('btn-delete').style.display = 'inline-block';
+            document.getElementById('btn-edit').style.display = 'none';
+            document.getElementById('btn-export').style.display = 'none';
+            document.getElementById('btn-save').style.display = 'none';
+            document.querySelector('.security-bar').style.display = 'none';
+            showModalMessage('Could not load this note. You can delete it.', 'error');
+            setEditMode(false);
+            document.getElementById('modal').classList.add('open');
+            return;
+        }
+
+        const note = await res.json();
+
+        if (note.corrupted) {
+            document.getElementById('modal-title').textContent = note.title;
+            document.getElementById('modal-note-title').value = '';
+            document.getElementById('modal-note-content').value = '';
+            document.getElementById('btn-delete').style.display = 'inline-block';
+            document.getElementById('btn-edit').style.display = 'none';
+            document.getElementById('btn-export').style.display = 'none';
+            document.getElementById('btn-save').style.display = 'none';
+            document.querySelector('.security-bar').style.display = 'none';
+            showModalMessage('This note is corrupted and cannot be decrypted. You can delete it.', 'error');
+            setEditMode(false);
+            document.getElementById('modal').classList.add('open');
+            return;
+        }
+
         document.getElementById('modal-title').textContent = note.title;
         document.getElementById('modal-note-title').value = note.title;
         document.getElementById('modal-note-content').value = note.content;
@@ -271,16 +305,16 @@
         document.getElementById('btn-edit').style.display = 'inline-block';
         document.getElementById('btn-export').style.display = 'inline-block';
         document.getElementById('btn-save').style.display = 'none';
-        document.getElementById('modal-message').innerHTML = '';
-        document.getElementById('export-panel').classList.remove('open');
-        document.getElementById('export-result').innerHTML = '';
-        document.getElementById('export-image').value = '';
+        const msgEl = document.getElementById('modal-message');
+        msgEl.innerHTML = '';
+        msgEl.className = '';
 
         const sigBadge = document.getElementById('sig-badge');
         sigBadge.innerHTML = note.signature_valid
-            ? '<span class="badge badge-green">✓ Valid signature</span>'
-            : '<span class="badge badge-red">✕ Invalid signature</span>';
+            ? '<span class="badge badge-green">&#10003; Valid signature</span>'
+            : '<span class="badge badge-red">&#10007; Invalid signature — content may have been tampered with</span>';
 
+        document.querySelector('.security-bar').style.display = 'flex';
         setEditMode(false);
         document.getElementById('modal').classList.add('open');
     }

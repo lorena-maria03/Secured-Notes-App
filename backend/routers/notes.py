@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+import time
 
 from database import get_db
 from models import Note, NoteKey, UserKey
@@ -38,9 +39,18 @@ def create_note(data: NoteCreate, request: Request, db: Session = Depends(get_db
         raise HTTPException(status_code=404, detail="User keys not found")
 
     aes_key = generate_aes_key()
+
+    start = time.time()
     encrypted_content, iv = encrypt_aes(data.content, aes_key)
+    print(f"[TIMING] AES encrypt: {(time.time()-start)*1000:.2f}ms")
+
+    start = time.time()
     encrypted_aes_key = encrypt_with_rsa(aes_key, user_key.public_key)
-    signature = sign_note(data.content, user_key.private_key_enc)
+    print(f"[TIMING] RSA encrypt AES key: {(time.time()-start)*1000:.2f}ms")
+
+    start = time.time()
+    signature = sign_note(data.title, data.content, user_key.private_key_enc)
+    print(f"[TIMING] RSA-PSS sign: {(time.time()-start)*1000:.2f}ms")
 
     note = Note(
         owner_id=user_id,
@@ -78,7 +88,7 @@ def update_note(note_id: int, data: NoteCreate, request: Request, db: Session = 
     aes_key = generate_aes_key()
     encrypted_content, iv = encrypt_aes(data.content, aes_key)
     encrypted_aes_key = encrypt_with_rsa(aes_key, user_key.public_key)
-    signature = sign_note(data.content, user_key.private_key_enc)
+    signature = sign_note(data.title, data.content, user_key.private_key_enc)
 
     note.title = data.title
     note.content_encrypted = encrypted_content
@@ -123,17 +133,44 @@ def get_note(note_id: int, request: Request, db: Session = Depends(get_db)):
 
     note_key = db.query(NoteKey).filter(NoteKey.note_id == note_id).first()
     if not note_key:
-        raise HTTPException(status_code=404, detail="Note key not found")
+        return {
+            "id": note.id,
+            "title": note.title,
+            "content": None,
+            "signature_valid": False,
+            "corrupted": True,
+            "created_at": note.created_at
+        }
 
-    aes_key = decrypt_with_rsa(note_key.encrypted_aes_key, user_key.private_key_enc)
-    content = decrypt_aes(note.content_encrypted, aes_key, note.content_iv)
-    is_valid = verify_signature(content, note.signature, user_key.public_key)
+    try:
+        start = time.time()
+        aes_key = decrypt_with_rsa(note_key.encrypted_aes_key, user_key.private_key_enc)
+        print(f"[TIMING] RSA decrypt AES key: {(time.time()-start)*1000:.2f}ms")
+
+        start = time.time()
+        content = decrypt_aes(note.content_encrypted, aes_key, note.content_iv)
+        print(f"[TIMING] AES decrypt: {(time.time()-start)*1000:.2f}ms")
+    except Exception as e:
+        print(f"[ERROR] Decryption failed for note {note_id}: {e}")
+        return {
+            "id": note.id,
+            "title": note.title,
+            "content": None,
+            "signature_valid": False,
+            "corrupted": True,
+            "created_at": note.created_at
+        }
+
+    start = time.time()
+    is_valid = verify_signature(note.title, content, note.signature, user_key.public_key)
+    print(f"[TIMING] RSA-PSS verify: {(time.time()-start)*1000:.2f}ms")
 
     return {
         "id": note.id,
         "title": note.title,
         "content": content,
         "signature_valid": is_valid,
+        "corrupted": False,
         "created_at": note.created_at
     }
 

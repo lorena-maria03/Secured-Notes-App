@@ -33,12 +33,14 @@ def generate_otp(email: str) -> bool:
         """
     )
 
+    print(f"[2FA] Code for {email}: {code}")
+
     try:
         sg = sendgrid.SendGridAPIClient(api_key=SENDGRID_API_KEY)
         sg.send(message)
         return True
     except Exception as e:
-        print(f"SendGrid error: {e}")
+        print(f"[2FA] SendGrid error — email not sent: {e}")
         return False
 
 def verify_otp(email: str, code: str) -> bool:
