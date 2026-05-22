@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.sql import func
 from database import Base
 
@@ -10,6 +10,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    two_factor_enabled = Column(Boolean, default=False, nullable=False, server_default="0")
     created_at = Column(DateTime, server_default=func.now())
 
 
@@ -20,6 +21,7 @@ class UserKey(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
     public_key = Column(Text, nullable=False)
     private_key_enc = Column(Text, nullable=False)
+    two_factor_secret = Column(String, nullable=True)
 
 
 class Note(Base):

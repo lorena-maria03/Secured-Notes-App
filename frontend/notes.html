@@ -82,6 +82,15 @@
 
         .extracted-preview { background: #F5F3FF; border: 1px solid #C4B5FD; border-radius: 8px; padding: 14px; margin-top: 12px; font-size: 13px; color: #5B21B6; white-space: pre-wrap; word-break: break-all; max-height: 150px; overflow-y: auto; }
         .divider { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+
+        /* TOTP setup modal */
+        .totp-qr-wrap { text-align: center; margin: 16px 0; }
+        .totp-qr-wrap img { border-radius: 8px; border: 1px solid #eee; max-width: 200px; }
+        .totp-secret-box { background: #F5F3FF; border: 1px solid #C4B5FD; border-radius: 8px; padding: 10px 14px; font-family: monospace; font-size: 14px; color: #5B21B6; text-align: center; letter-spacing: 2px; margin-bottom: 4px; word-break: break-all; }
+        .totp-step { font-size: 13px; color: #555; margin-bottom: 12px; line-height: 1.6; }
+        .totp-step strong { color: #1a1a1a; }
+        .badge-totp-on { background: #D1FAE5; color: #065F46; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .badge-totp-off { background: #FEE2E2; color: #991B1B; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
     </style>
 </head>
 <body>
@@ -90,6 +99,7 @@
     <h1>Secured Notes</h1>
     <div class="navbar-right">
         <span id="user-email"></span>
+        <button class="btn-outline" onclick="openSecurityModal()">Security</button>
         <button class="btn-outline" onclick="logout()">Logout</button>
     </div>
 </nav>
@@ -156,6 +166,63 @@
     </div>
 </div>
 
+<!-- Security / TOTP Modal -->
+<div class="modal-overlay" id="security-modal">
+    <div class="modal" style="max-width:460px">
+        <div class="modal-header">
+            <h2>Security settings</h2>
+            <button class="btn-outline" onclick="closeSecurityModal()">✕</button>
+        </div>
+
+        <p class="totp-step" style="margin-bottom:20px;">
+            Two-factor authentication adds an extra layer of security. After entering your password,
+            you'll be asked for a one-time code from your authenticator app (Authy, Google Authenticator, etc.).
+        </p>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <span style="font-size:14px; font-weight:500;">Authenticator app</span>
+            <span id="totp-status-badge"></span>
+        </div>
+
+        <!-- Setup flow (shown when TOTP is OFF) -->
+        <div id="totp-setup-section">
+            <button class="btn-primary" style="width:100%" onclick="startTotpSetup()">Set up authenticator app</button>
+
+            <div id="totp-qr-step" style="display:none; margin-top:20px;">
+                <hr class="divider" style="margin-top:0"/>
+                <p class="totp-step">
+                    <strong>Step 1.</strong> Open <strong>Authy</strong> (or any authenticator app) → tap <strong>Add account</strong> → scan the QR code below.
+                </p>
+                <div class="totp-qr-wrap">
+                    <img id="totp-qr-img" src="" alt="QR code"/>
+                </div>
+                <p class="totp-step" style="margin-top:8px;">
+                    Can't scan? Enter this code manually in the app:
+                </p>
+                <div class="totp-secret-box" id="totp-secret-display"></div>
+                <p class="totp-step" style="margin-top:16px;">
+                    <strong>Step 2.</strong> Enter the 6-digit code shown in your app to confirm setup.
+                </p>
+                <div class="form-group" style="margin-bottom:8px;">
+                    <input type="text" id="totp-confirm-code" placeholder="123456" maxlength="6" inputmode="numeric"/>
+                </div>
+                <button class="btn-success" style="width:100%" onclick="confirmTotpSetup()">Confirm & enable</button>
+                <div id="totp-setup-message" style="margin-top:10px;"></div>
+            </div>
+        </div>
+
+        <!-- Disable flow (shown when TOTP is ON) -->
+        <div id="totp-disable-section" style="display:none;">
+            <p class="totp-step">To disable your authenticator app, enter a current code from it to confirm.</p>
+            <div class="form-group">
+                <input type="text" id="totp-disable-code" placeholder="123456" maxlength="6" inputmode="numeric"/>
+            </div>
+            <button class="btn-danger" style="width:100%" onclick="disableTotp()">Disable authenticator app</button>
+            <div id="totp-disable-message" style="margin-top:10px;"></div>
+        </div>
+    </div>
+</div>
+
 <!-- Import Modal -->
 <div class="modal-overlay" id="import-modal">
     <div class="modal">
@@ -192,6 +259,8 @@
     let isEditMode = false;
     let exportOpen = false;
     let extractedContent = "";
+    let currentUser = null;
+    let totpPendingSecret = "";
 
     if (!token) window.location.href = 'index.html';
 
@@ -205,8 +274,8 @@
     async function loadUser() {
         const res = await authFetch(`${API}/auth/me`);
         if (res.ok) {
-            const data = await res.json();
-            document.getElementById('user-email').textContent = `Hello, ${data.username}`;
+            currentUser = await res.json();
+            document.getElementById('user-email').textContent = `Hello, ${currentUser.username}`;
         }
     }
 
@@ -492,13 +561,106 @@
 
     function logout() { localStorage.removeItem('token'); window.location.href = 'index.html'; }
 
-    document.getElementById('modal').addEventListener('click', function(e) {
-        if (e.target === this) closeModal();
-    });
+    // ── Security / TOTP modal ────────────────────────────────────────────────
 
-    document.getElementById('import-modal').addEventListener('click', function(e) {
-        if (e.target === this) closeImportModal();
-    });
+    function openSecurityModal() {
+        totpPendingSecret = "";
+        document.getElementById('totp-qr-step').style.display = 'none';
+        document.getElementById('totp-confirm-code').value = '';
+        document.getElementById('totp-disable-code').value = '';
+        document.getElementById('totp-setup-message').innerHTML = '';
+        document.getElementById('totp-disable-message').innerHTML = '';
+
+        const badge = document.getElementById('totp-status-badge');
+        const setupSection = document.getElementById('totp-setup-section');
+        const disableSection = document.getElementById('totp-disable-section');
+
+        if (currentUser && currentUser.two_factor_enabled) {
+            badge.innerHTML = '<span class="badge-totp-on">Enabled</span>';
+            setupSection.style.display = 'none';
+            disableSection.style.display = 'block';
+        } else {
+            badge.innerHTML = '<span class="badge-totp-off">Not enabled</span>';
+            setupSection.style.display = 'block';
+            disableSection.style.display = 'none';
+        }
+
+        document.getElementById('security-modal').classList.add('open');
+    }
+
+    function closeSecurityModal() {
+        document.getElementById('security-modal').classList.remove('open');
+        totpPendingSecret = "";
+    }
+
+    async function startTotpSetup() {
+        const res = await authFetch(`${API}/auth/totp/setup`, { method: 'POST' });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        totpPendingSecret = data.secret;
+        document.getElementById('totp-qr-img').src = `data:image/png;base64,${data.qr}`;
+        document.getElementById('totp-secret-display').textContent = data.secret;
+        document.getElementById('totp-qr-step').style.display = 'block';
+        document.getElementById('totp-confirm-code').focus();
+    }
+
+    async function confirmTotpSetup() {
+        const code = document.getElementById('totp-confirm-code').value.trim();
+        const msgEl = document.getElementById('totp-setup-message');
+
+        if (!code) { msgEl.innerHTML = '<div class="modal-message error">Enter the 6-digit code from your app</div>'; return; }
+
+        const res = await authFetch(`${API}/auth/totp/confirm`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ secret: totpPendingSecret, code })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            if (currentUser) currentUser.two_factor_enabled = true;
+            msgEl.innerHTML = '<div class="modal-message success">Authenticator app enabled! You\'ll be asked for a code on your next login.</div>';
+            document.getElementById('totp-status-badge').innerHTML = '<span class="badge-totp-on">Enabled</span>';
+            document.getElementById('totp-setup-section').style.display = 'none';
+            document.getElementById('totp-disable-section').style.display = 'block';
+        } else {
+            msgEl.innerHTML = `<div class="modal-message error">${data.detail || 'Error enabling TOTP'}</div>`;
+        }
+    }
+
+    async function disableTotp() {
+        const code = document.getElementById('totp-disable-code').value.trim();
+        const msgEl = document.getElementById('totp-disable-message');
+
+        if (!code) { msgEl.innerHTML = '<div class="modal-message error">Enter a code from your app to confirm</div>'; return; }
+
+        const res = await authFetch(`${API}/auth/totp/disable`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            if (currentUser) currentUser.two_factor_enabled = false;
+            msgEl.innerHTML = '<div class="modal-message success">Authenticator app disabled.</div>';
+            document.getElementById('totp-status-badge').innerHTML = '<span class="badge-totp-off">Not enabled</span>';
+            document.getElementById('totp-disable-section').style.display = 'none';
+            document.getElementById('totp-setup-section').style.display = 'block';
+            document.getElementById('totp-qr-step').style.display = 'none';
+        } else {
+            msgEl.innerHTML = `<div class="modal-message error">${data.detail || 'Error disabling TOTP'}</div>`;
+        }
+    }
+
+    // Unified backdrop-click close for all modals
+    [['modal', closeModal], ['import-modal', closeImportModal], ['security-modal', closeSecurityModal]]
+        .forEach(([id, fn]) => {
+            document.getElementById(id).addEventListener('click', function(e) {
+                if (e.target === this) fn();
+            });
+        });
 
     loadUser();
     loadNotes();

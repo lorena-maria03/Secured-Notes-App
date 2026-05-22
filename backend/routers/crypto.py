@@ -2,25 +2,14 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from pydantic import BaseModel
 
 from security.stego import hide_message_in_image, extract_message_from_image
-from security.jwt import get_user_id_from_token
+from dependencies import get_current_user_id
 
 router = APIRouter()
 
-# ------------ Schemas
 
 class SQLCheckSchema(BaseModel):
     input_text: str
 
-# ---------------- Helper
-
-def get_current_user_id(request: Request) -> int:
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    if not token:
-        raise HTTPException(status_code=401, detail="Missing token")
-    user_id = get_user_id_from_token(token)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return int(user_id)
 
 # ------------- SQL Injection checker
 

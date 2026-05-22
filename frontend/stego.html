@@ -104,7 +104,7 @@
 </div>
 
 <script>
-    const API = "http://127.0.0.1:8001";
+    const API = "http://127.0.0.1:8000";
     let token = localStorage.getItem('token');
 
     if (!token) window.location.href = 'index.html';
@@ -125,13 +125,12 @@
 
         const formData = new FormData();
         formData.append('image', imageFile);
-        formData.append('message', message);
 
         try {
             const res = await fetch(`${API}/crypto/stego/hide?message=${encodeURIComponent(message)}`, {
                 method: 'POST',
                 headers: authHeaders(),
-                body: (() => { const fd = new FormData(); fd.append('image', imageFile); return fd; })()
+                body: formData
             });
 
             if (res.ok) {

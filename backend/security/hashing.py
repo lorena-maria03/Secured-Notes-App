@@ -3,11 +3,12 @@ import os
 
 PEPPER = os.getenv("PASSWORD_PEPPER", "default_pepper_schimba_asta")
 
+BCRYPT_ROUNDS = 12
+
+
 def hash_password(password: str) -> str:
-    # add pepper + random salt generated de bcrypt
     peppered = password + PEPPER
-    salt = bcrypt.gensalt(rounds=12) # 12 rounds
-    hashed = bcrypt.hashpw(peppered.encode("utf-8"), salt)
+    hashed = bcrypt.hashpw(peppered.encode("utf-8"), bcrypt.gensalt(rounds=BCRYPT_ROUNDS))
     return hashed.decode("utf-8")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

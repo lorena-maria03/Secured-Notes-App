@@ -23,6 +23,10 @@
         .message.error { background: #FEE2E2; color: #991B1B; display: block; }
         .message.success { background: #D1FAE5; color: #065F46; display: block; }
         .otp-section { display: none; }
+        .totp-section { display: none; }
+        .totp-hint { font-size: 12px; color: #888; margin-top: 6px; line-height: 1.5; }
+        .fallback-link { display: block; text-align: center; margin-top: 14px; font-size: 13px; color: #4F46E5; cursor: pointer; background: none; border: none; width: 100%; text-decoration: underline; }
+        .fallback-link:hover { color: #4338CA; }
     </style>
 </head>
 <body>
@@ -45,6 +49,29 @@
             <input type="password" id="login-password" placeholder="••••••••" autocomplete="new-password"/>
         </div>
         <button class="primary" onclick="this.blur(); login()">Login</button>
+        <button class="fallback-link" onclick="showForgotForm()">Forgot password?</button>
+    </div>
+
+    <div id="forgot-form" style="display:none;">
+        <div class="form-group">
+            <label>Enter your email address</label>
+            <input type="email" id="forgot-email" placeholder="email@example.com"/>
+        </div>
+        <button class="primary" onclick="this.blur(); forgotPassword()">Send reset link</button>
+        <button class="fallback-link" onclick="showLoginForm()">Back to login</button>
+    </div>
+
+    <div id="reset-form" style="display:none;">
+        <div class="form-group">
+            <label>New password</label>
+            <input type="password" id="reset-password" placeholder="••••••••"/>
+            <p style="font-size:11px; color:#999; margin-top:4px;">Min. 8 characters, one uppercase, one lowercase, one number</p>
+        </div>
+        <div class="form-group">
+            <label>Confirm new password</label>
+            <input type="password" id="reset-password-confirm" placeholder="••••••••"/>
+        </div>
+        <button class="primary" onclick="this.blur(); resetPassword()">Set new password</button>
     </div>
 
     <div class="otp-section" id="otp-form">
@@ -53,6 +80,17 @@
             <input type="text" id="otp-code" placeholder="123456" maxlength="6"/>
         </div>
         <button class="primary" onclick="this.blur(); verify2fa()">Verify code</button>
+        <button class="fallback-link" id="use-totp-link" style="display:none" onclick="useAuthenticatorInstead()">Use authenticator app instead</button>
+    </div>
+
+    <div class="totp-section" id="totp-form">
+        <div class="form-group">
+            <label>Authenticator app code</label>
+            <input type="text" id="totp-code" placeholder="123456" maxlength="6" inputmode="numeric"/>
+            <p class="totp-hint">Open Authy or your authenticator app and enter the 6-digit code shown for Secured Notes.</p>
+        </div>
+        <button class="primary" onclick="this.blur(); verifyTotp()">Verify code</button>
+        <button class="fallback-link" onclick="useEmailInstead()">I don't have my phone — send code to my email</button>
     </div>
 
     <div id="register-form" style="display:none;">
@@ -78,19 +116,46 @@
 <script>
     const API = "http://127.0.0.1:8000";
     let pendingEmail = "";
+    let pendingResetToken = "";
 
     window.addEventListener('load', () => {
         document.getElementById('login-email').value = '';
         document.getElementById('login-password').value = '';
+        const params = new URLSearchParams(window.location.search);
+        const resetToken = params.get('reset');
+        if (resetToken) {
+            pendingResetToken = resetToken;
+            showAuthStep('reset-form', false);
+            document.querySelector('p.subtitle').textContent = 'Set a new password for your account';
+        }
     });
+
+    function showSection(id) {
+        ['login-form','forgot-form','reset-form','otp-form','totp-form','register-form']
+            .forEach(s => document.getElementById(s).style.display = 'none');
+        document.getElementById(id).style.display = 'block';
+        hideMessage();
+    }
+
+    function showAuthStep(id, showTabs) {
+        showSection(id);
+        document.querySelector('.tabs').style.display = showTabs ? 'flex' : 'none';
+    }
+
+    function showForgotForm() {
+        showAuthStep('forgot-form', false);
+        document.getElementById('forgot-email').value = document.getElementById('login-email').value;
+        document.getElementById('forgot-email').focus();
+    }
+
+    function showLoginForm() {
+        showAuthStep('login-form', true);
+    }
 
     function switchTab(tab, event) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         event.target.classList.add('active');
-        document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
-        document.getElementById('register-form').style.display = tab === 'register' ? 'block' : 'none';
-        document.getElementById('otp-form').style.display = 'none';
-        hideMessage();
+        showAuthStep(tab === 'login' ? 'login-form' : 'register-form', true);
     }
 
     function showMessage(text, type) {
@@ -103,75 +168,78 @@
         document.getElementById('message').className = 'message';
     }
 
-    async function register() {
-    const username = document.getElementById('reg-username').value;
-    const email = document.getElementById('reg-email').value;
-    const password = document.getElementById('reg-password').value;
-
-    if (!username || !email || !password) {
-        showMessage('Please fill in all fields', 'error');
-        return;
-    }
-
-    try {
-        const res = await fetch(`${API}/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, email, password })
-        });
-        const data = await res.json();
-        if (res.ok) {
-            showMessage('Account created! You can now log in.', 'success');
-        } else {
-            if (Array.isArray(data.detail)) {
-                const msg = data.detail
-                    .map(e => e.msg.replace('Value error, ', ''))
-                    .join(' • ');
-                showMessage(msg, 'error');
-            } else {
-                showMessage(data.detail || 'Registration error', 'error');
-            }
+    function extractErrorMessage(data, fallback) {
+        if (Array.isArray(data.detail)) {
+            return data.detail
+                .map(e => e.msg.replace('Value error, ', '').replace('value is not a valid email address: ', ''))
+                .join(' • ');
         }
-    } catch (e) {
-        showMessage('Connection error', 'error');
+        return data.detail || fallback;
     }
-}
+
+    async function register() {
+        const username = document.getElementById('reg-username').value;
+        const email = document.getElementById('reg-email').value;
+        const password = document.getElementById('reg-password').value;
+
+        if (!username || !email || !password) {
+            showMessage('Please fill in all fields', 'error');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API}/auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showMessage('Account created! You can now log in.', 'success');
+            } else {
+                showMessage(extractErrorMessage(data, 'Registration error'), 'error');
+            }
+        } catch (e) {
+            showMessage('Connection error', 'error');
+        }
+    }
 
     async function login() {
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
 
-    if (!email || !password) {
-        showMessage('Please fill in all fields', 'error');
-        return;
-    }
-
-    try {
-        const res = await fetch(`${API}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-        const data = await res.json();
-        if (res.ok && data.requires_2fa) {
-            pendingEmail = data.email;
-            document.getElementById('login-form').style.display = 'none';
-            document.getElementById('otp-form').style.display = 'block';
-            showMessage('Verification code sent to your email!', 'success');
-        } else {
-            if (Array.isArray(data.detail)) {
-                const msg = data.detail
-                    .map(e => e.msg.replace('Value error, ', '').replace('value is not a valid email address: ', ''))
-                    .join(' • ');
-                showMessage(msg, 'error');
-            } else {
-                showMessage(data.detail || 'Login error', 'error');
-            }
+        if (!email || !password) {
+            showMessage('Please fill in all fields', 'error');
+            return;
         }
-    } catch (e) {
-        showMessage('Connection error', 'error');
+
+        try {
+            const res = await fetch(`${API}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (res.ok && data.requires_totp) {
+                pendingEmail = data.email;
+                document.getElementById('login-form').style.display = 'none';
+                document.getElementById('totp-form').style.display = 'block';
+                document.getElementById('totp-code').value = '';
+                document.getElementById('totp-code').focus();
+                hideMessage();
+            } else if (res.ok && data.requires_2fa) {
+                pendingEmail = data.email;
+                document.getElementById('login-form').style.display = 'none';
+                document.getElementById('otp-form').style.display = 'block';
+                document.getElementById('use-totp-link').style.display = 'none';
+                showMessage('Verification code sent to your email!', 'success');
+            } else {
+                showMessage(extractErrorMessage(data, 'Login error'), 'error');
+            }
+        } catch (e) {
+            showMessage('Connection error', 'error');
+        }
     }
-}
 
     async function verify2fa() {
         const code = document.getElementById('otp-code').value;
@@ -188,6 +256,103 @@
                 window.location.href = 'notes.html';
             } else {
                 showMessage(data.detail || 'Invalid code', 'error');
+            }
+        } catch (e) {
+            showMessage('Connection error', 'error');
+        }
+    }
+
+    async function verifyTotp() {
+        const code = document.getElementById('totp-code').value.trim();
+        if (!code) { showMessage('Enter the 6-digit code from your app', 'error'); return; }
+
+        try {
+            const res = await fetch(`${API}/auth/totp/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: pendingEmail, code })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                localStorage.setItem('token', data.access_token);
+                window.location.href = 'notes.html';
+            } else {
+                showMessage(data.detail || 'Invalid code', 'error');
+            }
+        } catch (e) {
+            showMessage('Connection error', 'error');
+        }
+    }
+
+    async function useEmailInstead() {
+        hideMessage();
+        try {
+            const res = await fetch(`${API}/auth/request-email-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: pendingEmail })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById('totp-form').style.display = 'none';
+                document.getElementById('otp-form').style.display = 'block';
+                document.getElementById('otp-code').value = '';
+                document.getElementById('use-totp-link').style.display = 'block';
+                showMessage('Verification code sent to your email!', 'success');
+            } else {
+                showMessage(data.detail || 'Could not send email code', 'error');
+            }
+        } catch (e) {
+            showMessage('Connection error', 'error');
+        }
+    }
+
+    function useAuthenticatorInstead() {
+        document.getElementById('otp-form').style.display = 'none';
+        document.getElementById('totp-form').style.display = 'block';
+        document.getElementById('totp-code').value = '';
+        document.getElementById('totp-code').focus();
+        hideMessage();
+    }
+
+    async function forgotPassword() {
+        const email = document.getElementById('forgot-email').value.trim();
+        if (!email) { showMessage('Enter your email address', 'error'); return; }
+
+        try {
+            const res = await fetch(`${API}/auth/forgot-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            const data = await res.json();
+            showMessage(data.message || 'Reset link sent', 'success');
+        } catch (e) {
+            showMessage('Connection error', 'error');
+        }
+    }
+
+    async function resetPassword() {
+        const password = document.getElementById('reset-password').value;
+        const confirm = document.getElementById('reset-password-confirm').value;
+
+        if (!password || !confirm) { showMessage('Please fill in both fields', 'error'); return; }
+        if (password !== confirm) { showMessage('Passwords do not match', 'error'); return; }
+
+        try {
+            const res = await fetch(`${API}/auth/reset-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: pendingResetToken, new_password: password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                history.replaceState({}, '', '/index.html');
+                showAuthStep('login-form', true);
+                document.querySelector('p.subtitle').textContent = 'End-to-end encrypted notes';
+                showMessage('Password updated! You can now log in.', 'success');
+            } else {
+                showMessage(data.detail || 'Reset failed', 'error');
             }
         } catch (e) {
             showMessage('Connection error', 'error');

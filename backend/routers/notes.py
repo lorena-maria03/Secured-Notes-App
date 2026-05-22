@@ -10,7 +10,7 @@ from security.crypto import (
     encrypt_with_rsa, decrypt_with_rsa,
     sign_note, verify_signature
 )
-from security.jwt import get_user_id_from_token
+from dependencies import get_current_user_id
 
 router = APIRouter()
 
@@ -18,16 +18,6 @@ router = APIRouter()
 class NoteCreate(BaseModel):
     title: str
     content: str
-
-
-def get_current_user_id(request: Request) -> int:
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    if not token:
-        raise HTTPException(status_code=401, detail="Token missing")
-    user_id = get_user_id_from_token(token)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return int(user_id)
 
 
 @router.post("/")
@@ -60,14 +50,9 @@ def create_note(data: NoteCreate, request: Request, db: Session = Depends(get_db
         signature=signature
     )
     db.add(note)
-    db.commit()
-    db.refresh(note)
+    db.flush()  # assigns note.id without committing
 
-    note_key = NoteKey(
-        note_id=note.id,
-        encrypted_aes_key=encrypted_aes_key
-    )
-    db.add(note_key)
+    db.add(NoteKey(note_id=note.id, encrypted_aes_key=encrypted_aes_key))
     db.commit()
 
     return {"message": "Note created", "note_id": note.id}

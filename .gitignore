@@ -4,4 +4,15 @@ __pycache__/
 .venv/
 *.pyc
 *.pyo
-.DS_Store.idea/
+.DS_Store
+.idea/
+.run/
+.logs/
+CLAUDE.md
+.claude/
+
+# Paper / research artefacts
+AQTR_*
+SecuredNotes_Paper*
+*.drawio
+figure_*.png
