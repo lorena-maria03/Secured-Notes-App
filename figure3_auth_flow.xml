@@ -1,0 +1,298 @@
+<mxfile host="app.diagrams.net" modified="2026-05-22T00:00:00.000Z" agent="Claude Code" version="21.0.0">
+  <diagram name="Authentication Flow" id="fig3">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ═══ SHARED TOP SECTION ═══ -->
+
+        <!-- Column headers -->
+        <mxCell id="lbl_shared" value="Shared" style="text;html=1;fontStyle=1;fontSize=13;fillColor=none;strokeColor=none;align=center;" vertex="1" parent="1">
+          <mxGeometry x="384" y="10" width="220" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="lbl_left" value="Email OTP Path" style="text;html=1;fontStyle=1;fontSize=13;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="60" y="10" width="240" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="lbl_right" value="TOTP (Authenticator App) Path" style="text;html=1;fontStyle=1;fontSize=13;fillColor=#ffffd6;strokeColor=#d6b656;rounded=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="750" y="10" width="300" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Start -->
+        <mxCell id="s_start" value="START" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="424" y="55" width="140" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- POST /auth/login -->
+        <mxCell id="s_login" value="Client: POST /auth/login&#xa;{ email, password }" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="394" y="120" width="200" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Rate limit check -->
+        <mxCell id="s_rl1" value="IP rate limit&#xa;exceeded?" style="rhombus;whiteSpace=wrap;html=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="409" y="198" width="170" height="70" as="geometry"/>
+        </mxCell>
+        <!-- 429 error (left of diamond) -->
+        <mxCell id="s_429a" value="429 Too Many&#xa;Requests" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="200" y="213" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_rl1_429" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="s_rl1" target="s_429a">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Verify credentials -->
+        <mxCell id="s_cred" value="Verify credentials&#xa;bcrypt(password + pepper)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="384" y="300" width="220" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Credentials valid? -->
+        <mxCell id="s_valid" value="Credentials&#xa;valid?" style="rhombus;whiteSpace=wrap;html=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="414" y="382" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <!-- invalid path (left) -->
+        <mxCell id="s_invalid" value="record_attempt(ip)&#xa;401 Unauthorized" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="200" y="397" width="165" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_valid_no" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="s_valid" target="s_invalid">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- two_factor_enabled? -->
+        <mxCell id="s_totp_check" value="user.two_factor&#xa;_enabled?" style="rhombus;whiteSpace=wrap;html=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="409" y="484" width="170" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrows: shared flow -->
+        <mxCell id="e_start_login" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="s_start" target="s_login">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_login_rl1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="s_login" target="s_rl1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_rl1_cred" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="s_rl1" target="s_cred">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_cred_valid" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="s_cred" target="s_valid">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_valid_check" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="s_valid" target="s_totp_check">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══ LEFT BRANCH: Email OTP ═══ -->
+
+        <!-- generate_otp + send email -->
+        <mxCell id="l_genotp" value="generate_otp(email)&#xa;Send OTP via email" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="600" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <!-- return requires_2fa -->
+        <mxCell id="l_ret2fa" value="Return&#xa;{ requires_2fa: true }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="680" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <!-- Client submits verify-2fa -->
+        <mxCell id="l_submit" value="Client: POST /auth/verify-2fa&#xa;{ email, code }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="760" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <!-- Rate limit -->
+        <mxCell id="l_rl" value="IP rate limit&#xa;exceeded?" style="rhombus;whiteSpace=wrap;html=1;fontSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="75" y="840" width="190" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="l_429" value="429 Too Many&#xa;Requests" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="310" y="855" width="150" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="el_rl_429" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="l_rl" target="l_429">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- verify_otp -->
+        <mxCell id="l_verotp" value="verify_otp(email, code)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="944" width="220" height="46" as="geometry"/>
+        </mxCell>
+        <!-- OTP valid? -->
+        <mxCell id="l_otpvalid" value="OTP&#xa;valid?" style="rhombus;whiteSpace=wrap;html=1;fontSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="85" y="1020" width="170" height="70" as="geometry"/>
+        </mxCell>
+        <!-- invalid OTP -->
+        <mxCell id="l_otp401" value="record_attempt(ip)&#xa;401 Invalid code" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="310" y="1035" width="150" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="el_otpvalid_no" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="l_otpvalid" target="l_otp401">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- clear_attempts -->
+        <mxCell id="l_clear" value="clear_attempts(ip)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1120" width="220" height="46" as="geometry"/>
+        </mxCell>
+
+        <!-- Left branch arrows -->
+        <mxCell id="el_check_left" value="FALSE" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="s_totp_check" target="l_genotp">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="410" y="555"/>
+              <mxPoint x="170" y="555"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="el_genotp_ret" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="l_genotp" target="l_ret2fa">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="el_ret_submit" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="l_ret2fa" target="l_submit">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="el_submit_rl" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="l_submit" target="l_rl">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="el_rl_ver" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="l_rl" target="l_verotp">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="el_ver_valid" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="l_verotp" target="l_otpvalid">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="el_otpvalid_yes" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="l_otpvalid" target="l_clear">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══ RIGHT BRANCH: TOTP ═══ -->
+
+        <!-- record_pending_login -->
+        <mxCell id="r_pending" value="record_pending_login(email)&#xa;TTL = 5 minutes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffd6;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="730" y="600" width="260" height="50" as="geometry"/>
+        </mxCell>
+        <!-- return requires_totp -->
+        <mxCell id="r_rettotp" value="Return&#xa;{ requires_totp: true }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffd6;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="730" y="680" width="260" height="50" as="geometry"/>
+        </mxCell>
+        <!-- Client submits totp/verify -->
+        <mxCell id="r_submit" value="Client: POST /auth/totp/verify&#xa;{ email, code }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffd6;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="730" y="760" width="260" height="50" as="geometry"/>
+        </mxCell>
+        <!-- Rate limit -->
+        <mxCell id="r_rl" value="IP rate limit&#xa;exceeded?" style="rhombus;whiteSpace=wrap;html=1;fontSize=12;fillColor=#ffffd6;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="750" y="840" width="220" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="r_429" value="429 Too Many&#xa;Requests" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="855" width="150" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="er_rl_429" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="r_rl" target="r_429">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- is_pending_login? -->
+        <mxCell id="r_pending_check" value="is_pending_login&#xa;(email)?" style="rhombus;whiteSpace=wrap;html=1;fontSize=12;fillColor=#ffffd6;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="750" y="944" width="220" height="70" as="geometry"/>
+        </mxCell>
+        <!-- no pending login -->
+        <mxCell id="r_403" value="record_attempt(ip)&#xa;403 No active session" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="959" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="er_pending_no" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="r_pending_check" target="r_403">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- verify_totp_code -->
+        <mxCell id="r_vertotp" value="verify_totp_code(secret, code)&#xa;(pyotp, ±1 window)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffd6;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="730" y="1044" width="260" height="50" as="geometry"/>
+        </mxCell>
+        <!-- TOTP valid? -->
+        <mxCell id="r_totpvalid" value="TOTP&#xa;valid?" style="rhombus;whiteSpace=wrap;html=1;fontSize=12;fillColor=#ffffd6;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="760" y="1126" width="200" height="70" as="geometry"/>
+        </mxCell>
+        <!-- invalid TOTP -->
+        <mxCell id="r_totp401" value="record_attempt(ip)&#xa;401 Invalid code" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="1141" width="150" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="er_totpvalid_no" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="r_totpvalid" target="r_totp401">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- clear_attempts -->
+        <mxCell id="r_clear" value="clear_attempts(ip)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffd6;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="730" y="1226" width="260" height="46" as="geometry"/>
+        </mxCell>
+
+        <!-- Right branch arrows -->
+        <mxCell id="er_check_right" value="TRUE" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="s_totp_check" target="r_pending">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="578" y="555"/>
+              <mxPoint x="860" y="555"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="er_pending_ret" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="r_pending" target="r_rettotp">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="er_ret_submit" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="r_rettotp" target="r_submit">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="er_submit_rl" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="r_submit" target="r_rl">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="er_rl_pending" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="r_rl" target="r_pending_check">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="er_pending_ver" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="r_pending_check" target="r_vertotp">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="er_ver_valid" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="r_vertotp" target="r_totpvalid">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="er_totpvalid_yes" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="r_totpvalid" target="r_clear">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══ SHARED BOTTOM SECTION ═══ -->
+
+        <!-- Issue JWT -->
+        <mxCell id="b_jwt" value="Issue JWT&#xa;{ sub: user.id, pv: password_version }&#xa;Expiry: 30 minutes (HS256)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="344" y="1320" width="300" height="60" as="geometry"/>
+        </mxCell>
+        <!-- Return token -->
+        <mxCell id="b_token" value="Return { access_token }" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="364" y="1410" width="260" height="46" as="geometry"/>
+        </mxCell>
+        <!-- Client stores -->
+        <mxCell id="b_store" value="Client stores token in&#xa;localStorage → redirect to notes.html" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="324" y="1486" width="340" height="50" as="geometry"/>
+        </mxCell>
+        <!-- END -->
+        <mxCell id="b_end" value="END" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="424" y="1564" width="140" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Join arrows: left and right clear_attempts → JWT -->
+        <mxCell id="ej_left" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="l_clear" target="b_jwt">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="170" y="1290"/>
+              <mxPoint x="494" y="1290"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ej_right" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="r_clear" target="b_jwt">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="860" y="1290"/>
+              <mxPoint x="494" y="1290"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ej_jwt_token" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="b_jwt" target="b_token">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ej_token_store" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="b_token" target="b_store">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ej_store_end" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="b_store" target="b_end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══ EMAIL FALLBACK NOTE ═══ -->
+        <mxCell id="fallback_note" value="&lt;b&gt;Email fallback for TOTP users:&lt;/b&gt;&#xa;POST /auth/request-email-otp&#xa;checks is_pending_login → sends OTP&#xa;then follows Email OTP path" style="rounded=1;fillColor=#ffffd6;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="730" y="1320" width="280" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══ NEW indicator note ═══ -->
+        <mxCell id="new_note" value="&lt;b&gt;Legend:&lt;/b&gt;&#xa;Blue = Email OTP path (existing)&#xa;Yellow = TOTP path (new)&#xa;Red = Error response" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;align=left;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1320" width="220" height="70" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

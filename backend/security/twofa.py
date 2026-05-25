@@ -112,6 +112,21 @@ def is_pending_login(email: str) -> bool:
     return True
 
 
+# -- Per-email reset send cooldown (prevents inbox flooding from multiple IPs) --
+
+reset_send_times: dict = {}
+RESET_EMAIL_COOLDOWN_SECONDS = 60
+
+
+def can_send_reset_email(email: str) -> bool:
+    next_allowed = reset_send_times.get(email)
+    return not next_allowed or datetime.utcnow() >= next_allowed
+
+
+def record_reset_email_sent(email: str):
+    reset_send_times[email] = datetime.utcnow() + timedelta(seconds=RESET_EMAIL_COOLDOWN_SECONDS)
+
+
 # -- Password reset tokens --
 
 reset_store: dict = {}

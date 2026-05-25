@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from pydantic import BaseModel
 
 from security.stego import hide_message_in_image, extract_message_from_image
@@ -15,35 +15,42 @@ class SQLCheckSchema(BaseModel):
 
 SQL_PATTERNS = [
     "--", ";--", ";", "/*", "*/", "xp_",
-    "SELECT", "DROP", "INSERT", "UPDATE",
-    "DELETE", "UNION", "OR 1=1", "' OR '",
-    "1=1", "OR TRUE", "SLEEP(", "BENCHMARK("
+    "SELECT", "DROP", "INSERT", "UPDATE", "DELETE",
+    "UNION", "TRUNCATE", "EXEC", "EXECUTE", "DECLARE",
+    "OR 1=1", "AND 1=1", "AND 1=2", "OR 1=2",
+    "' OR '", "1=1", "OR TRUE", "AND TRUE",
+    "SLEEP(", "BENCHMARK(", "WAITFOR",
+    "CAST(", "CONVERT(", "CHAR(", "HEX(",
+    "@@", "INFORMATION_SCHEMA",
 ]
 
-@router.post("/check-sql")
-def check_sql_injection(data: SQLCheckSchema, request: Request):
-    get_current_user_id(request)
+_DISCLAIMER = (
+    "Pattern-based detection only — does not catch all injection techniques "
+    "(e.g. inline comments, hex encoding, second-order injection)."
+)
 
+@router.post("/check-sql")
+def check_sql_injection(data: SQLCheckSchema, _: int = Depends(get_current_user_id)):
     input_upper = data.input_text.upper()
     found = [p for p in SQL_PATTERNS if p.upper() in input_upper]
 
     if found:
         return {
             "safe": False,
-            "message": "SQL injection detected!",
-            "patterns_found": found
+            "message": "SQL injection patterns detected.",
+            "patterns_found": found,
+            "disclaimer": _DISCLAIMER,
         }
-    return {"safe": True, "message": "Safe input"}
+    return {"safe": True, "message": "No known patterns detected.", "disclaimer": _DISCLAIMER}
 
 # ------------------ Steganografie
 
 @router.post("/stego/hide")
 async def hide_message(
-    request: Request,
     message: str,
-    image: UploadFile = File(...)
+    image: UploadFile = File(...),
+    _: int = Depends(get_current_user_id),
 ):
-    get_current_user_id(request)
 
     if not image.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
@@ -64,10 +71,9 @@ async def hide_message(
 
 @router.post("/stego/extract")
 async def extract_message(
-    request: Request,
-    image: UploadFile = File(...)
+    image: UploadFile = File(...),
+    _: int = Depends(get_current_user_id),
 ):
-    get_current_user_id(request)
 
     if not image.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")

@@ -57,7 +57,7 @@
             <label>Enter your email address</label>
             <input type="email" id="forgot-email" placeholder="email@example.com"/>
         </div>
-        <button class="primary" onclick="this.blur(); forgotPassword()">Send reset link</button>
+        <button id="btn-forgot-submit" class="primary" onclick="this.blur(); forgotPassword()">Send reset link</button>
         <button class="fallback-link" onclick="showLoginForm()">Back to login</button>
     </div>
 
@@ -319,6 +319,9 @@
         const email = document.getElementById('forgot-email').value.trim();
         if (!email) { showMessage('Enter your email address', 'error'); return; }
 
+        const btn = document.getElementById('btn-forgot-submit');
+        btn.disabled = true;
+
         try {
             const res = await fetch(`${API}/auth/forgot-password`, {
                 method: 'POST',
@@ -326,10 +329,27 @@
                 body: JSON.stringify({ email })
             });
             const data = await res.json();
-            showMessage(data.message || 'Reset link sent', 'success');
+            if (res.status === 429) {
+                showMessage(data.detail || 'Too many attempts. Try again later.', 'error');
+            } else {
+                showMessage(data.message || 'Reset link sent', 'success');
+            }
         } catch (e) {
             showMessage('Connection error', 'error');
         }
+
+        let remaining = 60;
+        btn.textContent = `Resend in ${remaining}s`;
+        const timer = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                clearInterval(timer);
+                btn.disabled = false;
+                btn.textContent = 'Send reset link';
+            } else {
+                btn.textContent = `Resend in ${remaining}s`;
+            }
+        }, 1000);
     }
 
     async function resetPassword() {

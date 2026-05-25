@@ -1,0 +1,158 @@
+<mxfile host="app.diagrams.net" modified="2026-05-22T00:00:00.000Z" agent="Claude Code" version="21.0.0">
+  <diagram name="Note Encryption Flow" id="fig4">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Column headers -->
+        <mxCell id="lbl_enc" value="ENCRYPTION (Save / Update Note)" style="text;html=1;fontStyle=1;fontSize=14;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="60" y="20" width="440" height="36" as="geometry"/>
+        </mxCell>
+        <mxCell id="lbl_dec" value="DECRYPTION (Read Note)" style="text;html=1;fontStyle=1;fontSize=14;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="660" y="20" width="440" height="36" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- ENCRYPTION COLUMN -->
+        <!-- ═══════════════════════════════════ -->
+
+        <mxCell id="e_start" value="User submits note&#xa;{ title, plaintext_content }" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="80" width="340" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_aeskey" value="Generate random AES-256 key&#xa;(32 bytes, per-note)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="162" width="340" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_iv" value="Generate random IV&#xa;(16 bytes, AES block size)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="244" width="340" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_encrypt" value="Encrypt content:&#xa;AES-256-CBC(key, IV, plaintext)&#xa;→ content_enc (base64)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="326" width="340" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_loadpub" value="Load user RSA-2048 public key&#xa;from UserKey (PEM)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="420" width="340" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_rsakey" value="Encrypt AES key:&#xa;RSA-OAEP / SHA-256 (public_key, aes_key)&#xa;→ key_enc (base64)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="502" width="340" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_loadpriv" value="Load user RSA-2048 private key&#xa;from UserKey (PEM)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="596" width="340" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_sign" value="Sign note:&#xa;RSA-PSS / SHA-256 (private_key, title+content)&#xa;→ signature (base64)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="678" width="340" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_store" value="Store in database:&#xa;Note(title, content_enc, iv, signature)&#xa;NoteKey(key_enc, user_id, note_id)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="774" width="340" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_end" value="Note saved" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="190" y="862" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Encryption flow arrows -->
+        <mxCell id="ea1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="e_start" target="e_aeskey"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ea2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="e_aeskey" target="e_iv"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ea3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="e_iv" target="e_encrypt"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ea4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="e_encrypt" target="e_loadpub"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ea5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="e_loadpub" target="e_rsakey"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ea6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="e_rsakey" target="e_loadpriv"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ea7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="e_loadpriv" target="e_sign"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ea8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="e_sign" target="e_store"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ea9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="e_store" target="e_end"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ═══════════════════════════════════ -->
+        <!-- DECRYPTION COLUMN -->
+        <!-- ═══════════════════════════════════ -->
+
+        <mxCell id="d_start" value="GET /notes/{id}&#xa;(authenticated request)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="710" y="80" width="340" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="d_load" value="Load Note + NoteKey records&#xa;from database" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="710" y="162" width="340" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="d_loadpriv" value="Load user RSA-2048 private key&#xa;from UserKey (PEM)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="710" y="244" width="340" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="d_deckey" value="Decrypt AES key:&#xa;RSA-OAEP / SHA-256 (private_key, key_enc)&#xa;→ aes_key (32 bytes)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="710" y="326" width="340" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="d_decrypt" value="Decrypt content:&#xa;AES-256-CBC(aes_key, iv, content_enc)&#xa;→ plaintext" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="710" y="420" width="340" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="d_loadpub" value="Load user RSA-2048 public key&#xa;from UserKey (PEM)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="710" y="514" width="340" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="d_verify" value="Verify signature:&#xa;RSA-PSS / SHA-256 (public_key, title+content, signature)&#xa;→ signature_valid (bool)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="710" y="596" width="340" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="d_check" value="Signature&#xa;valid?" style="rhombus;whiteSpace=wrap;html=1;fontSize=12;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="760" y="690" width="240" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- corrupted path -->
+        <mxCell id="d_corrupt" value="Set corrupted: true&#xa;(still return plaintext)" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="705" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="ed_check_no" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="d_check" target="d_corrupt">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="d_return" value="Return:&#xa;{ content, title, signature_valid, corrupted }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="710" y="796" width="340" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="d_end" value="Client displays note" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="790" y="874" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Decryption flow arrows -->
+        <mxCell id="da1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="d_start" target="d_load"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="da2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="d_load" target="d_loadpriv"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="da3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="d_loadpriv" target="d_deckey"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="da4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="d_deckey" target="d_decrypt"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="da5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="d_decrypt" target="d_loadpub"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="da6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="d_loadpub" target="d_verify"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="da7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="d_verify" target="d_check"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="da8" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=11;" edge="1" parent="1" source="d_check" target="d_return">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- corrupt path rejoins -->
+        <mxCell id="da8b" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="d_corrupt" target="d_return">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1170" y="745"/>
+              <mxPoint x="1170" y="821"/>
+              <mxPoint x="1050" y="821"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="da9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="d_return" target="d_end"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ═══ CENTER DIVIDER ═══ -->
+        <mxCell id="divider" value="" style="line;strokeWidth=2;strokeColor=#666666;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="555" y="60" width="10" height="860" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══ CRYPTO PRIMITIVES LEGEND ═══ -->
+        <mxCell id="legend" value="&lt;b&gt;Crypto Primitives:&lt;/b&gt;&#xa;AES-256-CBC — symmetric content encryption&#xa;RSA-2048 OAEP/SHA-256 — key wrapping&#xa;RSA-2048 PSS/SHA-256 — digital signature&#xa;IV = 16-byte random initialization vector" style="text;html=1;strokeColor=#d79b00;fillColor=#ffe6cc;align=left;verticalAlign=top;spacingLeft=8;fontSize=11;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="930" width="680" height="80" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

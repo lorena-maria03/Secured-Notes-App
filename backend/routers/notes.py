@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import time
@@ -21,8 +21,7 @@ class NoteCreate(BaseModel):
 
 
 @router.post("/")
-def create_note(data: NoteCreate, request: Request, db: Session = Depends(get_db)):
-    user_id = get_current_user_id(request)
+def create_note(data: NoteCreate, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
 
     user_key = db.query(UserKey).filter(UserKey.user_id == user_id).first()
     if not user_key:
@@ -59,8 +58,7 @@ def create_note(data: NoteCreate, request: Request, db: Session = Depends(get_db
 
 
 @router.put("/{note_id}")
-def update_note(note_id: int, data: NoteCreate, request: Request, db: Session = Depends(get_db)):
-    user_id = get_current_user_id(request)
+def update_note(note_id: int, data: NoteCreate, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
 
     user_key = db.query(UserKey).filter(UserKey.user_id == user_id).first()
     if not user_key:
@@ -91,8 +89,7 @@ def update_note(note_id: int, data: NoteCreate, request: Request, db: Session = 
 
 
 @router.get("/")
-def get_notes(request: Request, db: Session = Depends(get_db)):
-    user_id = get_current_user_id(request)
+def get_notes(user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
     notes = db.query(Note).filter(Note.owner_id == user_id).all()
     return [
         {
@@ -105,8 +102,7 @@ def get_notes(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/{note_id}")
-def get_note(note_id: int, request: Request, db: Session = Depends(get_db)):
-    user_id = get_current_user_id(request)
+def get_note(note_id: int, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
 
     note = db.query(Note).filter(Note.id == note_id, Note.owner_id == user_id).first()
     if not note:
@@ -161,8 +157,7 @@ def get_note(note_id: int, request: Request, db: Session = Depends(get_db)):
 
 
 @router.delete("/{note_id}")
-def delete_note(note_id: int, request: Request, db: Session = Depends(get_db)):
-    user_id = get_current_user_id(request)
+def delete_note(note_id: int, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
 
     note = db.query(Note).filter(Note.id == note_id, Note.owner_id == user_id).first()
     if not note:

@@ -1,5 +1,6 @@
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
+from typing import Optional
 import os
 from dotenv import load_dotenv
 
@@ -14,9 +15,13 @@ def create_token(data: dict) -> str:
     payload["exp"] = datetime.utcnow() + timedelta(minutes=EXPIRY_MINUTES)
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
-def get_user_id_from_token(token: str):
+def decode_token(token: str) -> Optional[dict]:
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload.get("sub")
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
         return None
+
+
+def get_user_id_from_token(token: str):
+    payload = decode_token(token)
+    return payload.get("sub") if payload else None

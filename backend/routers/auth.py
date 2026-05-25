@@ -7,7 +7,7 @@ from database import get_db
 from models import User, UserKey
 from security.hashing import hash_password, verify_password
 from security.jwt import create_token
-from security.twofa import generate_otp, verify_otp, generate_totp_secret, generate_totp_qr_base64, verify_totp_code, record_pending_login, is_pending_login, generate_reset_token, consume_reset_token, send_reset_email
+from security.twofa import generate_otp, verify_otp, generate_totp_secret, generate_totp_qr_base64, verify_totp_code, record_pending_login, is_pending_login, generate_reset_token, consume_reset_token, send_reset_email, can_send_reset_email, record_reset_email_sent
 from security.crypto import generate_rsa_keypair
 from security.ratelimit import is_rate_limited, record_attempt, clear_attempts
 from dependencies import get_current_user_id
@@ -141,15 +141,21 @@ def login(data: LoginSchema, request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/verify-2fa")
-def verify_2fa(data: VerifyOTPSchema, db: Session = Depends(get_db)):
+def verify_2fa(data: VerifyOTPSchema, request: Request, db: Session = Depends(get_db)):
+    ip = request.client.host
+    if is_rate_limited(ip):
+        raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
+
     if not verify_otp(data.email, data.code):
+        record_attempt(ip)
         raise HTTPException(status_code=401, detail="Invalid or expired code")
 
     user = db.query(User).filter(User.email == data.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    token = create_token({"sub": str(user.id)})
+    clear_attempts(ip)
+    token = create_token({"sub": str(user.id), "pv": user.password_version})
     return {"access_token": token}
 
 
@@ -159,11 +165,14 @@ def forgot_password(data: ForgotPasswordSchema, request: Request, db: Session = 
     if is_rate_limited(ip):
         raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
 
+    record_attempt(ip)  # counted on every call since each may fire an email
+
     user = db.query(User).filter(User.email == data.email).first()
-    if user:
+    if user and can_send_reset_email(data.email):
         token = generate_reset_token(data.email)
         base_url = str(request.base_url) + "index.html"
         send_reset_email(data.email, token, base_url)
+        record_reset_email_sent(data.email)
     return {"message": "If that email exists, a reset link has been sent"}
 
 
@@ -180,6 +189,7 @@ def reset_password(data: ResetPasswordSchema, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
 
     user.hashed_password = hash_password(data.new_password)
+    user.password_version += 1
     db.commit()
     return {"message": "Password updated successfully"}
 
@@ -196,8 +206,7 @@ def request_email_otp(data: RequestEmailOTPSchema, request: Request):
 
 
 @router.get("/me")
-def me(request: Request, db: Session = Depends(get_db)):
-    user_id = get_current_user_id(request)
+def me(user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -207,8 +216,7 @@ def me(request: Request, db: Session = Depends(get_db)):
 # ── TOTP endpoints ────────────────────────────────────────────────────────────
 
 @router.post("/totp/setup")
-def totp_setup(request: Request, db: Session = Depends(get_db)):
-    user_id = get_current_user_id(request)
+def totp_setup(user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -219,9 +227,7 @@ def totp_setup(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/totp/confirm")
-def totp_confirm(data: TOTPConfirmSchema, request: Request, db: Session = Depends(get_db)):
-    user_id = get_current_user_id(request)
-
+def totp_confirm(data: TOTPConfirmSchema, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
     if not verify_totp_code(data.secret, data.code):
         raise HTTPException(status_code=400, detail="Invalid code — make sure the code is current and try again")
 
@@ -238,9 +244,18 @@ def totp_confirm(data: TOTPConfirmSchema, request: Request, db: Session = Depend
 
 
 @router.post("/totp/verify")
-def totp_verify(data: TOTPVerifySchema, db: Session = Depends(get_db)):
+def totp_verify(data: TOTPVerifySchema, request: Request, db: Session = Depends(get_db)):
+    ip = request.client.host
+    if is_rate_limited(ip):
+        raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
+
+    if not is_pending_login(data.email):
+        record_attempt(ip)
+        raise HTTPException(status_code=403, detail="No active login session for this email")
+
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not user.two_factor_enabled:
+        record_attempt(ip)
         raise HTTPException(status_code=400, detail="TOTP not enabled for this account")
 
     user_key = db.query(UserKey).filter(UserKey.user_id == user.id).first()
@@ -248,15 +263,16 @@ def totp_verify(data: TOTPVerifySchema, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="TOTP secret missing")
 
     if not verify_totp_code(user_key.two_factor_secret, data.code):
+        record_attempt(ip)
         raise HTTPException(status_code=401, detail="Invalid or expired code")
 
-    token = create_token({"sub": str(user.id)})
+    clear_attempts(ip)
+    token = create_token({"sub": str(user.id), "pv": user.password_version})
     return {"access_token": token}
 
 
 @router.post("/totp/disable")
-def totp_disable(data: TOTPDisableSchema, request: Request, db: Session = Depends(get_db)):
-    user_id = get_current_user_id(request)
+def totp_disable(data: TOTPDisableSchema, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     user_key = db.query(UserKey).filter(UserKey.user_id == user_id).first()
 
