@@ -8,11 +8,9 @@ __pycache__/
 .idea/
 .run/
 .logs/
-CLAUDE.md
-.claude/
-
-# Paper / research artefacts
+*.png
 AQTR_*
 SecuredNotes_Paper*
 *.drawio
 figure_*.png
+*.xml

@@ -92,7 +92,6 @@ def get_otp_time_left(email: str) -> Optional[int]:
 
 
 # -- Pending login store (gates the email-fallback endpoint) --
-# Populated when a TOTP user passes password check. Expires in 5 minutes.
 
 pending_logins: dict = {}
 PENDING_TTL_MINUTES = 5
