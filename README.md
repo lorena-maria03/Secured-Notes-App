@@ -1,3 +1,4 @@
+
 # Secured Notes App
 
 A FastAPI + vanilla JS notes app with end-to-end encryption, two-factor authentication (email OTP + TOTP authenticator app), and password reset.
